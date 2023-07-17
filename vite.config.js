@@ -14,7 +14,7 @@ export default defineConfig({
             '@store': resolve(__dirname, './src/store'),
         }
     },
-    base: '/tx',
+    base: './',
     server: {
         port: 5173,
     }
