@@ -9,30 +9,27 @@ import {
     Spin,
     Tag,
     Popconfirm,
-    Row, Col, InputNumber, message
+    Row, Col, InputNumber, message, Badge
 } from 'antd';
-import {
-    getEthBalance,
-    getTxCount,
-    getZksEra,
-    getZksLite,
-    getZkSyncBridge,
-    exportToExcel
-} from "@utils"
+import {exportToExcel} from "@utils"
 import {useEffect, useState} from "react";
 import './index.css';
 import {Layout, Card} from 'antd';
 
 const {Content} = Layout;
 import {
+    AppstoreAddOutlined,
     DeleteOutlined,
     DownloadOutlined,
-    EditOutlined, HeartOutlined,
-    PlusOutlined, SettingOutlined,
+    EditOutlined,
+    PlusOutlined, SearchOutlined, SettingOutlined,
     SyncOutlined,
     UploadOutlined
 } from "@ant-design/icons";
 import {EyeOutlined, EyeInvisibleOutlined} from "@ant-design/icons"
+import {getAllZksSyncData} from "@utils/getZksyncData/index.js";
+import EcosystemModal from "@components/EcosystemModal/index.jsx";
+
 const {TextArea} = Input;
 
 function Zksync() {
@@ -41,9 +38,10 @@ function Zksync() {
     const [batchloading, setBatchLoading] = useState(false);
     const [zkSyncConfigStore, setZkSyncConfigStore] = useState({});
     const [data, setData] = useState([]);
-    const [hideColumn, setHideColumn] = useState(false);
+    const [hideColumn, setHideColumn] = useState(true);
     const [isBatchModalVisible, setIsBatchModalVisible] = useState(false);
     const [isWalletModalVisible, setIsWalletModalVisible] = useState(false);
+    const [ecosystemModalVisible, setEcosystemModalVisible] = useState(false);
     const [batchForm] = Form.useForm();
     const [walletForm] = Form.useForm();
     const [selectedKeys, setSelectedKeys] = useState([]);
@@ -51,6 +49,8 @@ function Zksync() {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
+    const [showAddressDetailModal, setShowAddressDetailModal] = useState(null);
+    const [addressDetail, setAddressDetail] = useState(null);
     useEffect(() => {
         setBatchProgress(0);
         const zksync_config = localStorage.getItem('zksync_config');
@@ -101,73 +101,13 @@ function Zksync() {
                     return item;
                 }));
                 const updatedData = [...data];
-                getZksEra(values.address).then(({balance2, tx2, usdcBalance}) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        zks2_balance: balance2,
-                        zks2_tx_amount: tx2,
-                        zks2_usdcBalance: usdcBalance,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
-                })
-                getZksLite(values.address).then(({balance1, tx1}) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        zks1_balance: balance1,
-                        zks1_tx_amount: tx1,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
-
-                })
-                getEthBalance(values.address, "ethereum").then((eth_balance) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        eth_balance,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
-
-                })
-                getTxCount(values.address, "ethereum").then((eth_tx_amount) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        eth_tx_amount,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
-                })
-                getZkSyncBridge(values.address).then(({
-                                                          zks2_last_tx,
-                                                          totalExchangeAmount,
-                                                          totalFee,
-                                                          contractActivity,
-                                                          dayActivity,
-                                                          weekActivity,
-                                                          monthActivity,
-                                                          l1Tol2Times,
-                                                          l1Tol2Amount,
-                                                          l2Tol1Times,
-                                                          l2Tol1Amount
-                                                      }) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        zks2_last_tx,
-                        totalExchangeAmount,
-                        totalFee,
-                        contractActivity,
-                        dayActivity,
-                        weekActivity,
-                        monthActivity,
-                        l1Tol2Times,
-                        l1Tol2Amount,
-                        l2Tol1Times,
-                        l2Tol1Amount,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
-                })
+                const newData = await getAllZksSyncData(values.address);
+                updatedData[index] = {
+                    ...updatedData[index],
+                    ...newData,
+                }
+                setData(updatedData);
+                localStorage.setItem('addresses', JSON.stringify(data));
             } else {
                 const newEntry = {
                     key: data.length.toString(),
@@ -191,61 +131,17 @@ function Zksync() {
                     contractActivity: null,
                     totalFee: null,
                     totalExchangeAmount: null,
+                    protocol: []
                 };
                 const newData = [...data, newEntry];
                 setData(newData);
-                getZksEra(values.address).then(({balance2, tx2, usdcBalance}) => {
-                    newEntry.zks2_balance = balance2;
-                    newEntry.zks2_tx_amount = tx2;
-                    newEntry.zks2_usdcBalance = usdcBalance;
-                    setData([...newData]);
+                getAllZksSyncData(values.address).then((resp) => {
+                    console.log(resp)
+                    const mergedData = {...newEntry, ...resp};
+                    const newData = [...data, mergedData];
+                    setData(newData);
                     localStorage.setItem('addresses', JSON.stringify(newData));
-                })
-                getZksLite(values.address).then(({balance1, tx1}) => {
-                    newEntry.zks1_balance = balance1;
-                    newEntry.zks1_tx_amount = tx1;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-
-                })
-                getEthBalance(values.address, "ethereum").then((eth_balance) => {
-                    newEntry.eth_balance = eth_balance;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-
-                })
-                getTxCount(values.address, "ethereum").then((eth_tx_amount) => {
-                    newEntry.eth_tx_amount = eth_tx_amount;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-                })
-                getZkSyncBridge(values.address).then(({
-                                                          zks2_last_tx,
-                                                          totalExchangeAmount,
-                                                          totalFee,
-                                                          contractActivity,
-                                                          dayActivity,
-                                                          weekActivity,
-                                                          monthActivity,
-                                                          l1Tol2Times,
-                                                          l1Tol2Amount,
-                                                          l2Tol1Times,
-                                                          l2Tol1Amount
-                                                      }) => {
-                    newEntry.zks2_last_tx = zks2_last_tx;
-                    newEntry.totalFee = totalFee;
-                    newEntry.contractActivity = contractActivity;
-                    newEntry.dayActivity = dayActivity;
-                    newEntry.weekActivity = weekActivity;
-                    newEntry.monthActivity = monthActivity;
-                    newEntry.l1Tol2Times = l1Tol2Times;
-                    newEntry.l1Tol2Amount = l1Tol2Amount;
-                    newEntry.l2Tol1Times = l2Tol1Times;
-                    newEntry.l2Tol1Amount = l2Tol1Amount;
-                    newEntry.totalExchangeAmount = totalExchangeAmount;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-                })
+                });
             }
         } catch (error) {
             notification.error({
@@ -266,7 +162,7 @@ function Zksync() {
         }
         setIsLoading(true);
         try {
-            const limit = 50;
+            const limit = 5;
             let activePromises = 0;
             let promisesQueue = [];
             const newData = [...data];
@@ -285,85 +181,22 @@ function Zksync() {
                 const index = newData.findIndex(item => item.key === key);
                 if (index !== -1) {
                     const item = newData[index];
-
                     promisesQueue.push(() => {
-                        item.zks2_balance = null;
-                        item.zks2_tx_amount = null;
-                        item.zks2_usdcBalance = null;
-                        return getZksEra(item.address).then(({balance2, tx2, usdcBalance}) => {
-                            item.zks2_balance = balance2;
-                            item.zks2_tx_amount = tx2;
-                            item.zks2_usdcBalance = usdcBalance;
+                        const keys = Object.keys(item);
+                        for (let key of keys) {
+                            if (key !== 'name' && key !== 'address' && key !== 'key') {
+                                item[key] = null;
+                            }
+                        }
+                        return getAllZksSyncData(item.address).then((resp) => {
+                            newData[index] = {
+                                ...item,
+                                ...resp,
+                            }
                             setData([...newData]);
                             localStorage.setItem('addresses', JSON.stringify(newData));
                         })
-                    });
-                    promisesQueue.push(() => {
-                        item.zks1_balance = null;
-                        item.zks1_tx_amount = null;
-                        return getZksLite(item.address).then(({balance1, tx1}) => {
-                            item.zks1_balance = balance1;
-                            item.zks1_tx_amount = tx1;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
-                    });
-                    promisesQueue.push(() => {
-                        item.eth_balance = null;
-                        return getEthBalance(item.address, "ethereum").then((eth_balance) => {
-                            item.eth_balance = eth_balance;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
-                    });
-                    promisesQueue.push(() => {
-                        item.eth_tx_amount = null;
-                        return getTxCount(item.address, "ethereum").then((eth_tx_amount) => {
-                            item.eth_tx_amount = eth_tx_amount;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
-                    });
-                    promisesQueue.push(() => {
-                        item.zks2_last_tx = null;
-                        item.totalExchangeAmount = null;
-                        item.totalFee = null;
-                        item.contractActivity = null;
-                        item.dayActivity = null;
-                        item.weekActivity = null;
-                        item.monthActivity = null;
-                        item.l1Tol2Times = null;
-                        item.l1Tol2Amount = null;
-                        item.l2Tol1Times = null;
-                        item.l2Tol1Amount = null;
-                        return getZkSyncBridge(item.address).then(({
-                                                                       zks2_last_tx,
-                                                                       totalExchangeAmount,
-                                                                       totalFee,
-                                                                       contractActivity,
-                                                                       dayActivity,
-                                                                       weekActivity,
-                                                                       monthActivity,
-                                                                       l1Tol2Times,
-                                                                       l1Tol2Amount,
-                                                                       l2Tol1Times,
-                                                                       l2Tol1Amount
-                                                                   }) => {
-                            item.zks2_last_tx = zks2_last_tx;
-                            item.totalExchangeAmount = totalExchangeAmount;
-                            item.totalFee = totalFee;
-                            item.contractActivity = contractActivity;
-                            item.dayActivity = dayActivity;
-                            item.weekActivity = weekActivity;
-                            item.monthActivity = monthActivity;
-                            item.l1Tol2Times = l1Tol2Times;
-                            item.l1Tol2Amount = l1Tol2Amount;
-                            item.l2Tol1Times = l2Tol1Times;
-                            item.l2Tol1Amount = l2Tol1Amount;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
-                    });
+                    })
                 }
                 processQueue();
             }
@@ -389,7 +222,7 @@ function Zksync() {
             const addresses = values.addresses.split("\n");
             setBatchLength(addresses.length);
             const newData = [...data];
-            const limit = 50;
+            const limit = 5;
             let activePromises = 0;
             let promisesQueue = [];
             setBatchProgress(0);
@@ -442,63 +275,23 @@ function Zksync() {
                     contractActivity: null,
                     totalFee: null,
                     totalExchangeAmount: null,
+                    protocol: []
                 };
                 if (index === -1) {
                     newData.push(item);
                 }
-                promisesQueue.push(() => getZksEra(address).then(({balance2, tx2, usdcBalance}) => {
-                    item.zks2_balance = balance2;
-                    item.zks2_tx_amount = tx2;
-                    item.zks2_usdcBalance = usdcBalance;
-                }));
-
-
-                promisesQueue.push(() => getZksLite(address).then(({balance1, tx1}) => {
-                    item.zks1_balance = balance1;
-                    item.zks1_tx_amount = tx1;
-                }));
-
-                promisesQueue.push(() => getEthBalance(address, "ethereum").then((eth_balance) => {
-                    item.eth_balance = eth_balance;
-                }));
-
-                promisesQueue.push(() => getTxCount(address, "ethereum").then((eth_tx_amount) => {
-                    item.eth_tx_amount = eth_tx_amount;
-                }));
-
-                promisesQueue.push(() => getZkSyncBridge(address).then(({
-                                                                            zks2_last_tx,
-                                                                            totalExchangeAmount,
-                                                                            totalFee,
-                                                                            contractActivity,
-                                                                            dayActivity,
-                                                                            weekActivity,
-                                                                            monthActivity,
-                                                                            l1Tol2Times,
-                                                                            l1Tol2Amount,
-                                                                            l2Tol1Times,
-                                                                            l2Tol1Amount
-                                                                        }) => {
-                    item.zks2_last_tx = zks2_last_tx;
-                    item.totalExchangeAmount = totalExchangeAmount;
-                    item.totalFee = totalFee;
-                    item.contractActivity = contractActivity;
-                    item.dayActivity = dayActivity;
-                    item.weekActivity = weekActivity;
-                    item.monthActivity = monthActivity;
-                    item.l1Tol2Times = l1Tol2Times;
-                    item.l1Tol2Amount = l1Tol2Amount;
-                    item.l2Tol1Times = l2Tol1Times;
-                    item.l2Tol1Amount = l2Tol1Amount;
-                }));
-                promisesQueue.push(promiseWithProgress);
+                promisesQueue.push(() => promiseWithProgress().then(() => getAllZksSyncData(address).then((resp) => {
+                    const mergedData = {...item, ...resp};
+                    const index = newData.findIndex(item => item.address === address);
+                    if (index !== -1) {
+                        newData[index] = mergedData;
+                    }
+                })));
                 processQueue();
-
             }
             while (activePromises > 0 || promisesQueue.length > 0) {
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
-
             setData(newData);
             localStorage.setItem('addresses', JSON.stringify(newData));
         } catch (error) {
@@ -627,7 +420,6 @@ function Zksync() {
             align: "center",
             render: (text, record) => {
                 if (hideColumn) {
-                    // 取前4位和后4位
                     return text.slice(0, 4) + '***' + text.slice(-4);
                 }
                 return isRowSatisfyCondition(record) ?
@@ -677,7 +469,15 @@ function Zksync() {
                     key: "zks1_tx_amount",
                     align: "center",
                     render: (text, record) => (text === null ? <Spin/> : text),
+                    sorter: (a, b) => a.zks1_tx_amount - b.zks1_tx_amount,
                 },
+                {
+                    title: "最后交易",
+                    dataIndex: "zks1_latest_tx",
+                    key: "zks1_latest_tx",
+                    align: "center",
+                    render: (text, record) => (text === null ? <Spin/> : text),
+                }
             ],
 
         },
@@ -706,6 +506,7 @@ function Zksync() {
                     key: "zks2_tx_amount",
                     align: "center",
                     render: (text, record) => (text === null ? <Spin/> : text),
+                    sorter: (a, b) => a.zks2_tx_amount - b.zks2_tx_amount,
                 },
                 {
                     title: "最后交易",
@@ -794,9 +595,10 @@ function Zksync() {
                             key: "totalExchangeAmount",
                             align: "center",
                             render: (text, record) => (text === null ? <Spin/> : text),
+                            sorter: (a, b) => a.totalExchangeAmount - b.totalExchangeAmount,
                         },
                         {
-                            title: "FeeΞ",
+                            title: "Fee(U)",
                             dataIndex: "totalFee",
                             key: "totalFee",
                             align: "center",
@@ -815,6 +617,7 @@ function Zksync() {
                     <Popconfirm title={"确认删除？"} onConfirm={() => handleDelete(record.key)}>
                         <Button icon={<DeleteOutlined/>}/>
                     </Popconfirm>
+                    <Button icon={<SearchOutlined/>} onClick={() => setShowAddressDetailModal(record.key)}/>
                 </Space>
             ),
         },
@@ -857,10 +660,91 @@ function Zksync() {
             return Number(record[recordKey]) >= Number(zkSyncConfigStore[conditionKey])
         });
     };
-
+    useEffect(() => {
+        let address;
+        let protocols;
+        if (showAddressDetailModal !== null) {
+            for (let i = 0; i < data.length; i++) {
+                if (data[i].key === showAddressDetailModal) {
+                    protocols = data[i]['protocol'] || [];
+                    address = data[i].address;
+                    setAddressDetail({address: address, protocols: protocols,});
+                    break;
+                }
+            }
+            console.log(addressDetail);
+        }
+    }, [showAddressDetailModal]);
+    const addressDetailColumns = [
+        {
+            title: '',
+            dataIndex: 'logo',
+            key: 'logo',
+            align: 'center',
+            render: (text, record) => (
+                <img src={'/protocol/' + record.id + '.png'} style={{width: '20px', height: '20px'}} alt={record.id}/>
+            ),
+        },
+        {
+            title: '协议',
+            dataIndex: 'name',
+            key: 'name',
+            align: 'center',
+            render: (text, record) => (
+                <a href={record.url} target="_blank" rel="noopener noreferrer">
+                    {text}
+                </a>
+            ),
+        },
+        {
+            title: 'tx',
+            dataIndex: 'interactions',
+            key: 'interactions',
+            sorter: (a, b) => a.volume - b.volume,
+            align: 'center',
+        },
+        {
+            title: '最后交易时间',
+            dataIndex: 'lastActivity',
+            key: 'lastActivity',
+            align: 'center',
+            render: (text, record) => (text === '' ? '无' : new Date(text).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})),
+        },
+        {
+            title: '交易金额(U)',
+            dataIndex: 'volume',
+            key: 'volume',
+            align: 'center',
+            sorter: (a, b) => a.volume - b.volume,
+            defaultSortOrder: 'descend',
+            render: (text, record) => (Number(text).toFixed(2)),
+        }
+    ]
     return (
         <div>
             <Content>
+                <EcosystemModal open={ecosystemModalVisible} onCancel={() => setEcosystemModalVisible(false)}/>
+                <Modal
+                    title={addressDetail && addressDetail.address + '  交互数据详情'}
+                    open={showAddressDetailModal !== null}
+                    onCancel={() => setShowAddressDetailModal(null)}
+                    footer={null}
+                    width={1000}
+                    centered={true}
+                    bodyStyle={{height: '500px', overflow: 'auto'}}
+                >
+                    <div>
+                        {addressDetail && (
+                            <Table
+                                columns={addressDetailColumns}
+                                dataSource={addressDetail.protocols}
+                                pagination={false}
+                                defaultSortOrder="descend"
+                                size={"small"}
+                            />
+                        )}
+                    </div>
+                </Modal>
                 <Modal title="批量添加地址" open={isBatchModalVisible} onOk={handleBatchOk}
                        onCancel={handleBatchCancel}
                        okButtonProps={{loading: isLoading}}
@@ -928,103 +812,117 @@ function Zksync() {
                         </Card>
                     </Form>
                 </Modal>
-                <Spin spinning={tableLoading}>
-                    <Table
-                        rowKey={record => record.key}
-                        rowSelection={rowSelection}
-                        dataSource={data}
-                        pagination={false}
-                        bordered={true}
-                        style={{marginBottom: "20px", zIndex: 2}}
-                        size={"small"}
-                        columns={columns}
-                        summary={pageData => {
-                            let ethBalance = 0;
-                            let zks1Balance = 0;
-                            let zks2Balance = 0;
-                            let zks2UsdcBalance = 0;
-                            let totalFees = 0;
-                            pageData.forEach(({
-                                                  eth_balance,
-                                                  zks1_balance,
-                                                  zks2_balance,
-                                                  zks2_usdcBalance,
-                                                  totalFee
-                                              }) => {
-                                ethBalance += Number(eth_balance);
-                                zks1Balance += Number(zks1_balance);
-                                zks2Balance += Number(zks2_balance);
-                                zks2UsdcBalance += Number(zks2_usdcBalance);
-                                totalFees += Number(totalFee);
-                            })
+                <div style={{marginBottom: "50px"}}>
+                    <Spin spinning={tableLoading}>
+                        <Table
+                            rowKey={record => record.key}
+                            rowSelection={rowSelection}
+                            dataSource={data}
+                            pagination={false}
+                            bordered={true}
+                            style={{marginBottom: "20px", zIndex: 2}}
+                            size={"small"}
+                            columns={columns}
+                            summary={pageData => {
+                                let ethBalance = 0;
+                                let zks1Balance = 0;
+                                let zks2Balance = 0;
+                                let zks2UsdcBalance = 0;
+                                let totalFees = 0;
+                                pageData.forEach(({
+                                                      eth_balance,
+                                                      zks1_balance,
+                                                      zks2_balance,
+                                                      zks2_usdcBalance,
+                                                      totalFee
+                                                  }) => {
+                                    ethBalance += Number(eth_balance);
+                                    zks1Balance += Number(zks1_balance);
+                                    zks2Balance += Number(zks2_balance);
+                                    zks2UsdcBalance += Number(zks2_usdcBalance);
+                                    totalFees += Number(totalFee);
+                                })
 
-                            const emptyCells = Array(10).fill().map((_, index) => <Table.Summary.Cell
-                                index={index + 6}/>);
+                                const emptyCells = Array(10).fill().map((_, index) => <Table.Summary.Cell
+                                    index={index + 6}/>);
 
-                            return (
-                                <>
-                                    <Table.Summary.Row>
-                                        <Table.Summary.Cell index={0} colSpan={4}>总计</Table.Summary.Cell>
-                                        <Table.Summary.Cell index={4}>{ethBalance.toFixed(4)}</Table.Summary.Cell>
-                                        <Table.Summary.Cell index={5}/>
-                                        <Table.Summary.Cell index={6}>{zks1Balance.toFixed(4)}</Table.Summary.Cell>
-                                        <Table.Summary.Cell index={7}/>
-                                        <Table.Summary.Cell index={8}>{zks2Balance.toFixed(4)}</Table.Summary.Cell>
-                                        <Table.Summary.Cell
-                                            index={9}>{zks2UsdcBalance.toFixed(2)}</Table.Summary.Cell>
-                                        {emptyCells}
-                                        <Table.Summary.Cell index={19}/>
-                                        <Table.Summary.Cell index={20}>{totalFees.toFixed(4)}</Table.Summary.Cell>
-                                    </Table.Summary.Row>
-                                </>
-                            )
-                        }}
-                        footer={() => (
-                            <Card>
-                                <div style={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    gap: '10px'
-                                }}>
-                                    <Button type="primary" onClick={() => {
-                                        setIsWalletModalVisible(true)
-                                    }} size={"large"} style={{width: "20%"}}
-                                            icon={<SettingOutlined/>}>
-                                        配置
-                                    </Button>
-                                    <Button type="primary" onClick={showModal} size={"large"} style={{width: "20%"}}
-                                            icon={<PlusOutlined/>}>
-                                        添加地址
-                                    </Button>
-                                    <Button type="primary" onClick={showBatchModal} size={"large"}
-                                            style={{width: "20%"}}
-                                            icon={<UploadOutlined/>}
-                                            loading={batchloading}
-                                    >
-                                        {batchloading ? `添加中 进度:(${batchProgress}/${batchLength})` : "批量添加地址"}
-                                    </Button>
-                                    <Button type="primary" onClick={handleRefresh} loading={isLoading}
-                                            size={"large"}
-                                            style={{width: "20%"}} icon={<SyncOutlined/>}>
-                                        {isLoading ? "正在刷新" : "刷新选中地址"}
-                                    </Button>
-                                    <Popconfirm title={"确认删除" + selectedKeys.length + "个地址？"}
-                                                onConfirm={handleDeleteSelected}>
-                                        <Button type="primary" danger size={"large"}
-                                                style={{width: "20%"}} icon={<DeleteOutlined/>}>
-                                            删除选中地址
-                                        </Button>
-                                    </Popconfirm>
-                                    <Button type="primary" icon={<DownloadOutlined/>} size={"large"}
-                                            style={{width: "8%"}}
-                                            onClick={exportToExcelFile}/>
-                                </div>
-                            </Card>
-                        )
-                        }
-                    />
-                </Spin>
+                                return (
+                                    <>
+                                        <Table.Summary.Row>
+                                            <Table.Summary.Cell index={0} colSpan={4}>总计</Table.Summary.Cell>
+                                            <Table.Summary.Cell index={5}>{ethBalance.toFixed(4)}</Table.Summary.Cell>
+                                            <Table.Summary.Cell index={6}/>
+                                            <Table.Summary.Cell index={7}>{zks1Balance.toFixed(4)}</Table.Summary.Cell>
+                                            <Table.Summary.Cell index={8}/>
+                                            <Table.Summary.Cell index={9}/>
+                                            <Table.Summary.Cell index={10}>{zks2Balance.toFixed(3)}</Table.Summary.Cell>
+                                            <Table.Summary.Cell
+                                                index={9}>{zks2UsdcBalance.toFixed(2)}</Table.Summary.Cell>
+                                            {emptyCells}
+                                            <Table.Summary.Cell index={20}/>
+                                            <Table.Summary.Cell index={21}>{totalFees.toFixed(2)}</Table.Summary.Cell>
+                                        </Table.Summary.Row>
+                                    </>
+                                )
+                            }}
+                        />
+                    </Spin>
+                </div>
+                <div className="zks_footer">
+                    <Card size={"small"} style={{width: '100%'}}>
+                        <div style={{
+                            width: '100%',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '10px'
+                        }}>
+                            <Button type="primary"
+                                    onClick={() => {
+                                        setEcosystemModalVisible(true)
+                                    }}
+                                    size="large"
+                                    style={{width: "20%"}}
+                                    icon={<AppstoreAddOutlined/>}
+                            >
+                                <Badge count={"New"} offset={[30, 0]}>
+                                    <span style={{color: 'white'}}>生态应用</span>
+                                </Badge>
+                            </Button>
+                            <Button type="primary" onClick={() => {
+                                setIsWalletModalVisible(true)
+                            }} size={"large"} style={{width: "20%"}}
+                                    icon={<SettingOutlined/>}>
+                                配置
+                            </Button>
+                            <Button type="primary" onClick={showModal} size={"large"} style={{width: "20%"}}
+                                    icon={<PlusOutlined/>}>
+                                添加地址
+                            </Button>
+                            <Button type="primary" onClick={showBatchModal} size={"large"}
+                                    style={{width: "20%"}}
+                                    icon={<UploadOutlined/>}
+                                    loading={batchloading}
+                            >
+                                {batchloading ? `添加中 进度:(${batchProgress}/${batchLength})` : "批量添加地址"}
+                            </Button>
+                            <Button type="primary" onClick={handleRefresh} loading={isLoading}
+                                    size={"large"}
+                                    style={{width: "20%"}} icon={<SyncOutlined/>}>
+                                {isLoading ? "正在刷新" : "刷新选中地址"}
+                            </Button>
+                            <Popconfirm title={"确认删除" + selectedKeys.length + "个地址？"}
+                                        onConfirm={handleDeleteSelected}>
+                                <Button type="primary" danger size={"large"}
+                                        style={{width: "20%"}} icon={<DeleteOutlined/>}>
+                                    删除选中地址
+                                </Button>
+                            </Popconfirm>
+                            <Button type="primary" icon={<DownloadOutlined/>} size={"large"}
+                                    style={{width: "8%"}}
+                                    onClick={exportToExcelFile}/>
+                        </div>
+                    </Card>
+                </div>
             </Content>
         </div>
     );
